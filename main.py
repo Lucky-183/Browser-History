@@ -34,10 +34,10 @@ class BrowserHistoryProcessor:
             return True
 
     def process_history(self):
-        with open("history.csv", newline='') as f:
+        with open("history.csv", newline='', encoding='UTF-8', errors='replace') as f:
             self.data = [row for row in csv.DictReader(f)]
             for i in range(len(self.data)):
-                self.data[i]['URL'] = parse.unquote(self.data[i]['URL'])
+                self.data[i]['URL'] = parse.unquote(self.data[i]['URL']).replace('\xa0', ' ')
                 self.extract_keyword(str(self.data[i]['URL']),i)
 
     def extract_keyword(self, url, i):
@@ -60,14 +60,14 @@ class BrowserHistoryProcessor:
             self.data[i]['Key']=""
 
     def save_processed_history_to_csv(self):
-        with open('history.csv', 'w', newline='', encoding='UTF-8') as f:
+        with open('history.csv', 'w', newline='', encoding='UTF-8', errors='replace') as f:
             writer = csv.DictWriter(f, fieldnames=self.data[0].keys())
             writer.writeheader()
             writer.writerows(self.data)
 
 
     def csv_to_xlsx(self):
-        with open('history.csv', 'r', encoding='UTF-8') as f:
+        with open('history.csv', 'r', encoding='UTF-8', errors='replace') as f:
             read = csv.reader(f)
             workbook = xlwt.Workbook()
             sheet = workbook.add_sheet('data')
@@ -86,7 +86,7 @@ class BrowserHistoryProcessor:
             original_book = xlrd.open_workbook(original_file)
             original_sheet = original_book.sheet_by_index(0)
             original_first_row = original_sheet.row_values(1)
-            original_first_timestamp = datetime.strptime(original_first_row[0], '%Y-%m-%d %H:%M:%S').timestamp()
+            original_first_timestamp = datetime.strptime(original_first_row[0], '%Y-%m-%d %H:%M:%S%z').timestamp()
             header_data= [original_sheet.row_values(0)]
             merged_data = [original_sheet.row_values(row) for row in range(1,original_sheet.nrows)]
             # 读取临时Excel文件的第一行时间戳
@@ -95,7 +95,7 @@ class BrowserHistoryProcessor:
 
 
             for row_index in range(1,temp_sheet.nrows):
-                temp_timestamp = datetime.strptime(temp_sheet.row_values(row_index)[0], '%Y-%m-%d %H:%M:%S').timestamp()
+                temp_timestamp = datetime.strptime(temp_sheet.row_values(row_index)[0], '%Y-%m-%d %H:%M:%S%z').timestamp()
             # 确定新旧数据的合并范围
                 if temp_timestamp > original_first_timestamp:
                     # 合并数据
@@ -103,14 +103,17 @@ class BrowserHistoryProcessor:
                 else:
                     break
             # 对合并后的数据按时间戳降序排序
-            merged_data.sort(key=lambda x: datetime.strptime(x[0], '%Y-%m-%d %H:%M:%S').timestamp(), reverse=True)
+            merged_data.sort(key=lambda x: datetime.strptime(x[0], '%Y-%m-%d %H:%M:%S%z').timestamp(), reverse=True)
 
             # 保存到新的Excel文件
             workbook = xlwt.Workbook()
             sheet = workbook.add_sheet('data')
-            for row_index, row_data in enumerate(merged_data):
+            for row_index, row_data in enumerate(header_data):
                 for col_index, value in enumerate(row_data):
                     sheet.write(row_index, col_index, value)
+            for row_index, row_data in enumerate(merged_data):
+                for col_index, value in enumerate(row_data):
+                    sheet.write(row_index+1, col_index, value)
             workbook.save('history.xls')
             remove('history_temp.xls')
 
@@ -155,7 +158,9 @@ class BrowserHistoryApp(tk.Tk):
             self.processor.csv_to_xlsx()
             self.processor.merge_histories()
         except Exception as e:
-            messagebox.showerror("Error"," Make sure the browser exist")
+            print(e)
+            messagebox.showerror("Error"," Make sure the browser exist And the file aren't occupied")
+            messagebox.showerror("Error",e)
             return
         messagebox.showinfo("Info", "Finished processing and saving browser history.")
 

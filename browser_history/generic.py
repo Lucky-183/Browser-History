@@ -609,7 +609,7 @@ class Outputs:
                     f"{', '.join(self.format_map.keys())}"
                 )
 
-        with open(filename, "w") as out_file:
+        with open(filename, "w",encoding='utf-8',errors='replace') as out_file:
             out_file.write(self.formatted(output_format))
 
 
